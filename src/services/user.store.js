@@ -35,6 +35,11 @@ const getById = (id) => usersById.get(id) || null;
 
 const getAll = () => Array.from(usersById.values());
 
+const reset = () => {
+  usersById.clear();
+  usersByEmail.clear();
+};
+
 const updateById = (id, updates) => {
   const existingUser = getById(id);
   if (!existingUser) {
@@ -56,5 +61,6 @@ module.exports = {
   getByEmail,
   getById,
   getAll,
+  reset,
   updateById
 };
