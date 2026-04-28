@@ -33,6 +33,8 @@ const getByEmail = (email) => {
 
 const getById = (id) => usersById.get(id) || null;
 
+const getAll = () => Array.from(usersById.values());
+
 const updateById = (id, updates) => {
   const existingUser = getById(id);
   if (!existingUser) {
@@ -53,5 +55,6 @@ module.exports = {
   create,
   getByEmail,
   getById,
+  getAll,
   updateById
 };

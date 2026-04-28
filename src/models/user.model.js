@@ -6,6 +6,13 @@ class UserModel {
       passwordHash: data.passwordHash,
       fullName: data.fullName || "",
       role: data.role || "user",
+      isPremium: Boolean(data.isPremium),
+      premiumUntil: data.premiumUntil || null,
+      premiumFeatures: data.premiumFeatures || {
+        offlineMaps: false,
+        unlimitedTrails: false,
+        advancedAnalytics: false
+      },
       phone: data.phone || "",
       country: data.country || "",
       preferredLanguage: data.preferredLanguage || "en",
