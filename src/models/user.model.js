@@ -5,6 +5,7 @@ class UserModel {
       email: data.email,
       passwordHash: data.passwordHash,
       fullName: data.fullName || "",
+      role: data.role || "user",
       phone: data.phone || "",
       country: data.country || "",
       preferredLanguage: data.preferredLanguage || "en",

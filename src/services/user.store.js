@@ -4,13 +4,14 @@ const UserModel = require("../models/user.model");
 const usersById = new Map();
 const usersByEmail = new Map();
 
-const create = ({ email, passwordHash, fullName }) => {
+const create = ({ email, passwordHash, fullName, role }) => {
   const now = new Date().toISOString();
   const user = UserModel.build({
     id: crypto.randomUUID(),
     email,
     passwordHash,
     fullName,
+    role,
     createdAt: now,
     updatedAt: now
   });
