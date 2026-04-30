@@ -174,6 +174,26 @@ const trailSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+      index: true
+    },
+    moderationNote: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    approvedBy: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    approvedAt: {
+      type: Date,
+      default: null
+    },
     version: {
       type: Number,
       default: 1,
@@ -186,5 +206,4 @@ const trailSchema = new mongoose.Schema(
 );
 
 trailSchema.index({ createdBy: 1, status: 1 });
-
 module.exports = mongoose.model("Trail", trailSchema);

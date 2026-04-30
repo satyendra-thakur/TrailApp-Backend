@@ -78,6 +78,37 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: ""
     },
+    role: {
+      type: String,
+      trim: true,
+      enum: ["user", "moderator", "admin", "super_admin"],
+      default: "user"
+    },
+    isPremium: {
+      type: Boolean,
+      default: false
+    },
+    premiumUntil: {
+      type: Date,
+      default: null
+    },
+    premiumFeatures: {
+      type: {
+        offlineMaps: {
+          type: Boolean,
+          default: false
+        },
+        unlimitedTrails: {
+          type: Boolean,
+          default: false
+        },
+        advancedAnalytics: {
+          type: Boolean,
+          default: false
+        }
+      },
+      default: () => ({})
+    },
     phone: {
       type: String,
       trim: true,
