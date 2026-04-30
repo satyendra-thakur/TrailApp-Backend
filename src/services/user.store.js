@@ -1,51 +1,31 @@
-const crypto = require("crypto");
 const UserModel = require("../models/user.model");
 
-const usersById = new Map();
-const usersByEmail = new Map();
+const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
 
-const create = ({ email, passwordHash, fullName }) => {
-  const now = new Date().toISOString();
-  const user = UserModel.build({
-    id: crypto.randomUUID(),
-    email,
+const create = async ({ email, passwordHash, fullName, preferredLanguage }) => {
+  const user = await UserModel.create({
+    email: normalizeEmail(email),
     passwordHash,
-    fullName,
-    createdAt: now,
-    updatedAt: now
+    fullName: String(fullName || "").trim(),
+    preferredLanguage: String(preferredLanguage || "en").trim() || "en"
   });
-
-  usersById.set(user.id, user);
-  usersByEmail.set(user.email, user.id);
 
   return user;
 };
 
-const getByEmail = (email) => {
-  const userId = usersByEmail.get(email);
-  if (!userId) {
-    return null;
-  }
-
-  return usersById.get(userId) || null;
+const getByEmail = async (email) => {
+  return UserModel.findOne({ email: normalizeEmail(email) });
 };
 
-const getById = (id) => usersById.get(id) || null;
+const getById = async (id) => {
+  return UserModel.findById(id);
+};
 
-const updateById = (id, updates) => {
-  const existingUser = getById(id);
-  if (!existingUser) {
-    return null;
-  }
-
-  const updatedUser = {
-    ...existingUser,
-    ...updates,
-    updatedAt: new Date().toISOString()
-  };
-
-  usersById.set(id, updatedUser);
-  return updatedUser;
+const updateById = async (id, updates) => {
+  return UserModel.findByIdAndUpdate(id, updates, {
+    new: true,
+    runValidators: true
+  });
 };
 
 module.exports = {
