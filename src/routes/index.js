@@ -5,6 +5,7 @@ const profileRoutes = require("./profile.routes");
 const groupRoutes = require("./group.routes");
 const trailRoutes = require("./trail.routes");
 const checklistRoutes = require("./checklist.routes");
+const messageRoutes = require("./message.routes");
 
 const router = express.Router();
 
@@ -12,6 +13,7 @@ router.use("/health", healthRoutes);
 router.use("/auth", authRoutes);
 router.use("/profile", profileRoutes);
 router.use("/groups", groupRoutes);
+router.use("/groups", messageRoutes);
 router.use("/trails", trailRoutes);
 router.use("/checklists", checklistRoutes);
 
