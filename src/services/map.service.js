@@ -71,7 +71,7 @@ const createHomestay = async (payload, userId) => {
     photos: Array.isArray(payload.photos) ? payload.photos : [],
     contactPhone: normalizeText(payload.contactPhone),
     trailIds: Array.isArray(payload.trailIds) ? payload.trailIds : [],
-    createdBy: userId
+    ownerId: userId
   });
 };
 
