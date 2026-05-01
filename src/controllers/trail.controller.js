@@ -11,63 +11,29 @@ const createTrail = async (req, res, next) => {
 
 const listTrails = async (req, res, next) => {
   try {
-    const trails = await trailService.listTrails(req.user.id);
+    const trails = await trailService.listTrails(req.user.id, {
+      status: req.query.status,
+      groupId: req.query.groupId
+    });
     res.status(200).json({ success: true, data: trails });
   } catch (error) {
     next(error);
   }
 };
 
-const getTrailById = async (req, res, next) => {
+const getTrail = async (req, res, next) => {
   try {
-    const trail = await trailService.getTrailById(req.params.trailId, req.user.id);
+    const trail = await trailService.getTrailById(req.params.id, req.user.id);
     res.status(200).json({ success: true, data: trail });
   } catch (error) {
     next(error);
   }
 };
 
-const updatePlanningStage = async (req, res, next) => {
+const updateTrail = async (req, res, next) => {
   try {
-    const trail = await trailService.updatePlanningStage(req.params.trailId, req.body, req.user.id);
-    res.status(200).json({ success: true, data: trail });
-  } catch (error) {
-    next(error);
-  }
-};
-
-const replaceWaypoints = async (req, res, next) => {
-  try {
-    const trail = await trailService.replaceWaypoints(req.params.trailId, req.body, req.user.id);
-    res.status(200).json({ success: true, data: trail });
-  } catch (error) {
-    next(error);
-  }
-};
-
-const replaceEmergencyNumbers = async (req, res, next) => {
-  try {
-    const trail = await trailService.replaceEmergencyNumbers(req.params.trailId, req.body, req.user.id);
-    res.status(200).json({ success: true, data: trail });
-  } catch (error) {
-    next(error);
-  }
-};
-
-const addChecklistItem = async (req, res, next) => {
-  try {
-    const trail = await trailService.addChecklistItem(req.params.trailId, req.body, req.user.id);
-    res.status(201).json({ success: true, data: trail });
-  } catch (error) {
-    next(error);
-  }
-};
-
-const toggleChecklistItemPacked = async (req, res, next) => {
-  try {
-    const trail = await trailService.toggleChecklistItemPacked(
-      req.params.trailId,
-      req.params.itemId,
+    const trail = await trailService.updateTrail(
+      req.params.id,
       req.body,
       req.user.id
     );
@@ -77,18 +43,62 @@ const toggleChecklistItemPacked = async (req, res, next) => {
   }
 };
 
-const deleteChecklistItem = async (req, res, next) => {
+const deleteTrail = async (req, res, next) => {
   try {
-    const trail = await trailService.deleteChecklistItem(req.params.trailId, req.params.itemId, req.user.id);
+    const result = await trailService.deleteTrail(req.params.id, req.user.id);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const addWaypoint = async (req, res, next) => {
+  try {
+    const trail = await trailService.addWaypoint(
+      req.params.id,
+      req.body,
+      req.user.id
+    );
+    res.status(201).json({ success: true, data: trail });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const removeWaypoint = async (req, res, next) => {
+  try {
+    const trail = await trailService.removeWaypoint(
+      req.params.id,
+      req.params.waypointId,
+      req.user.id
+    );
     res.status(200).json({ success: true, data: trail });
   } catch (error) {
     next(error);
   }
 };
 
-const exportOfflineBundle = async (req, res, next) => {
+const setEmergencyNumbers = async (req, res, next) => {
   try {
-    const bundle = await trailService.exportOfflineBundle(req.params.trailId, req.user.id);
+    const trail = await trailService.setEmergencyNumbers(
+      req.params.id,
+      req.body.emergencyNumbers,
+      req.user.id
+    );
+    res.status(200).json({ success: true, data: trail });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const exportBundle = async (req, res, next) => {
+  try {
+    const bundle = await trailService.exportBundle(req.params.id, req.user.id);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="trail-${req.params.id}.json"`
+    );
+    res.setHeader("Content-Type", "application/json");
     res.status(200).json({ success: true, data: bundle });
   } catch (error) {
     next(error);
@@ -98,12 +108,11 @@ const exportOfflineBundle = async (req, res, next) => {
 module.exports = {
   createTrail,
   listTrails,
-  getTrailById,
-  updatePlanningStage,
-  replaceWaypoints,
-  replaceEmergencyNumbers,
-  addChecklistItem,
-  toggleChecklistItemPacked,
-  deleteChecklistItem,
-  exportOfflineBundle
+  getTrail,
+  updateTrail,
+  deleteTrail,
+  addWaypoint,
+  removeWaypoint,
+  setEmergencyNumbers,
+  exportBundle
 };

@@ -15,7 +15,8 @@ const requireAuth = (req, res, next) => {
     const payload = jwt.verify(token, env.jwtSecret);
     req.user = {
       id: payload.sub,
-      email: payload.email
+      email: payload.email,
+      role: payload.role || "user"
     };
 
     return next();
@@ -26,6 +27,25 @@ const requireAuth = (req, res, next) => {
   }
 };
 
+const requireRole = (...allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      const error = new Error("Unauthorized: missing authenticated user");
+      error.statusCode = 401;
+      return next(error);
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      const error = new Error("Forbidden: insufficient role");
+      error.statusCode = 403;
+      return next(error);
+    }
+
+    return next();
+  };
+};
+
 module.exports = {
-  requireAuth
+  requireAuth,
+  requireRole
 };
