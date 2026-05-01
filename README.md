@@ -12,12 +12,14 @@ src/
     group.controller.js
     health.controller.js
     profile.controller.js
+    trail.controller.js
   middlewares/
     auth.middleware.js
     error.middleware.js
   models/
     group.model.js
     health.model.js
+    trail.model.js
     user.model.js
   routes/
     auth.routes.js
@@ -25,11 +27,13 @@ src/
     health.routes.js
     index.js
     profile.routes.js
+    trail.routes.js
   services/
     auth.service.js
     group.service.js
     health.service.js
     profile.service.js
+    trail.service.js
     user.store.js
   app.js
   server.js
@@ -99,3 +103,45 @@ All group endpoints require:
   - behavior:
     - prevents duplicate joins
     - adds user to `members` when valid
+
+## Trail planning endpoints
+
+All trail endpoints require:
+
+- header: `Authorization: Bearer <token>`
+
+- `POST /api/trails`
+  - description: create a trail draft in the trail creation pipeline
+  - body: `title` (required), `region` (required), `summary`, `difficulty`, `distanceKm`, `estimatedDurationHours`
+
+- `GET /api/trails`
+  - description: list trails created by the authenticated user
+
+- `GET /api/trails/:trailId`
+  - description: get one trail owned by the authenticated user
+
+- `PATCH /api/trails/:trailId/stage`
+  - description: update trail creation pipeline stage
+  - body: `planningStage` (`draft`, `route-mapped`, `safety-reviewed`, `checklist-ready`, `published`)
+
+- `PUT /api/trails/:trailId/waypoints`
+  - description: replace complete waypoints/checkpoints route
+  - body: `waypoints[]` with `name`, `kind`, `latitude`, `longitude`, optional `altitudeMeters`, `notes`, `order`
+
+- `PUT /api/trails/:trailId/emergency-numbers`
+  - description: set emergency numbers for a trail
+  - body: `emergencyNumbers[]` with `label`, `phone`, optional `countryCode`, `available24x7`
+
+- `POST /api/trails/:trailId/checklist`
+  - description: add one packing/gear checklist item
+  - body: `item` (required), optional `category`, `required`, `notes`
+
+- `PATCH /api/trails/:trailId/checklist/:itemId`
+  - description: mark checklist item packed/unpacked
+  - body: `packed` (boolean)
+
+- `DELETE /api/trails/:trailId/checklist/:itemId`
+  - description: remove checklist item
+
+- `POST /api/trails/:trailId/offline-export`
+  - description: generate offline trail data bundle (route + emergency contacts + checklist)
