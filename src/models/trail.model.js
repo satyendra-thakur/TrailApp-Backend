@@ -6,12 +6,28 @@ const waypointSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      maxlength: 100
+      maxlength: 120
     },
-    kind: {
+    description: {
       type: String,
-      enum: ["waypoint", "checkpoint", "camp", "water", "summit"],
-      default: "waypoint"
+      trim: true,
+      maxlength: 500,
+      default: ""
+    },
+    type: {
+      type: String,
+      enum: [
+        "start",
+        "checkpoint",
+        "rest",
+        "water",
+        "shelter",
+        "summit",
+        "viewpoint",
+        "danger",
+        "end"
+      ],
+      default: "checkpoint"
     },
     latitude: {
       type: Number,
@@ -25,23 +41,28 @@ const waypointSchema = new mongoose.Schema(
       min: -180,
       max: 180
     },
-    altitudeMeters: {
+    altitudeM: {
       type: Number,
-      default: 0
+      default: null
+    },
+    orderIndex: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    arrivalEstimateMin: {
+      type: Number,
+      default: null,
+      min: 0
     },
     notes: {
       type: String,
       trim: true,
-      maxlength: 280,
+      maxlength: 500,
       default: ""
-    },
-    order: {
-      type: Number,
-      required: true,
-      min: 1
     }
   },
-  { _id: false }
+  { _id: true }
 );
 
 const emergencyNumberSchema = new mongoose.Schema(
@@ -56,48 +77,17 @@ const emergencyNumberSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      maxlength: 30
+      maxlength: 40
     },
-    countryCode: {
+    type: {
       type: String,
-      trim: true,
-      maxlength: 6,
-      default: ""
+      enum: ["rescue", "police", "medical", "ranger", "fire", "other"],
+      default: "other"
     },
-    available24x7: {
-      type: Boolean,
-      default: true
-    }
-  },
-  { _id: false }
-);
-
-const checklistItemSchema = new mongoose.Schema(
-  {
-    item: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 100
-    },
-    category: {
+    country: {
       type: String,
       trim: true,
       maxlength: 60,
-      default: "general"
-    },
-    required: {
-      type: Boolean,
-      default: true
-    },
-    packed: {
-      type: Boolean,
-      default: false
-    },
-    notes: {
-      type: String,
-      trim: true,
-      maxlength: 220,
       default: ""
     }
   },
@@ -106,49 +96,54 @@ const checklistItemSchema = new mongoose.Schema(
 
 const trailSchema = new mongoose.Schema(
   {
-    title: {
+    name: {
       type: String,
       required: true,
       trim: true,
       minlength: 2,
       maxlength: 120
     },
-    summary: {
+    description: {
       type: String,
       trim: true,
-      maxlength: 800,
+      maxlength: 2000,
       default: ""
     },
     region: {
       type: String,
-      required: true,
       trim: true,
-      maxlength: 120
+      maxlength: 120,
+      default: ""
+    },
+    country: {
+      type: String,
+      trim: true,
+      maxlength: 60,
+      default: ""
+    },
+    difficulty: {
+      type: String,
+      enum: ["easy", "moderate", "hard", "expert"],
+      default: "moderate"
     },
     distanceKm: {
       type: Number,
       min: 0,
       default: 0
     },
-    estimatedDurationHours: {
+    estimatedDurationMin: {
       type: Number,
       min: 0,
       default: 0
     },
-    difficulty: {
-      type: String,
-      enum: ["easy", "moderate", "hard", "extreme"],
-      default: "moderate"
+    elevationGainM: {
+      type: Number,
+      min: 0,
+      default: 0
     },
-    createdBy: {
-      type: String,
-      required: true,
-      index: true
-    },
-    planningStage: {
-      type: String,
-      enum: ["draft", "route-mapped", "safety-reviewed", "checklist-ready", "published"],
-      default: "draft"
+    tags: {
+      type: [String],
+      default: []
     },
     waypoints: {
       type: [waypointSchema],
@@ -158,13 +153,51 @@ const trailSchema = new mongoose.Schema(
       type: [emergencyNumberSchema],
       default: []
     },
-    checklist: {
-      type: [checklistItemSchema],
-      default: []
+    status: {
+      type: String,
+      enum: ["draft", "planned", "active", "completed", "archived"],
+      default: "draft",
+      index: true
     },
-    lastOfflineExportedAt: {
+    plannedStartDate: {
       type: Date,
       default: null
+    },
+    groupId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Group",
+      default: null,
+      index: true
+    },
+    createdBy: {
+      type: String,
+      required: true,
+      index: true
+    },
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+      index: true
+    },
+    moderationNote: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    approvedBy: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    approvedAt: {
+      type: Date,
+      default: null
+    },
+    version: {
+      type: Number,
+      default: 1,
+      min: 1
     }
   },
   {
@@ -172,4 +205,5 @@ const trailSchema = new mongoose.Schema(
   }
 );
 
+trailSchema.index({ createdBy: 1, status: 1 });
 module.exports = mongoose.model("Trail", trailSchema);

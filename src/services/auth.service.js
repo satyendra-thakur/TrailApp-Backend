@@ -8,7 +8,8 @@ const buildToken = (user) => {
   return jwt.sign(
     {
       sub: user.id,
-      email: user.email
+      email: user.email,
+      role: user.role
     },
     env.jwtSecret,
     { expiresIn: env.jwtExpiresIn }
@@ -23,9 +24,10 @@ const validateEmail = (email) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 };
 
-const register = async ({ email, password, fullName }) => {
+const register = async ({ email, password, fullName, role }) => {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const normalizedFullName = String(fullName || "").trim();
+  const normalizedRole = String(role || "user").trim().toLowerCase();
 
   if (!validateEmail(normalizedEmail)) {
     const error = new Error("A valid email is required");
@@ -39,17 +41,18 @@ const register = async ({ email, password, fullName }) => {
     throw error;
   }
 
-  if (userStore.getByEmail(normalizedEmail)) {
+  if (await userStore.getByEmail(normalizedEmail)) {
     const error = new Error("Email is already registered");
     error.statusCode = 409;
     throw error;
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = userStore.create({
+  const user = await userStore.create({
     email: normalizedEmail,
     passwordHash,
-    fullName: normalizedFullName
+    fullName: normalizedFullName,
+    role: normalizedRole
   });
 
   return {
@@ -67,7 +70,7 @@ const login = async ({ email, password }) => {
     throw error;
   }
 
-  const user = userStore.getByEmail(normalizedEmail);
+  const user = await userStore.getByEmail(normalizedEmail);
 
   if (!user) {
     const error = new Error("Invalid credentials");
