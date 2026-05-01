@@ -12,12 +12,14 @@ src/
     group.controller.js
     health.controller.js
     profile.controller.js
+    trail.controller.js
   middlewares/
     auth.middleware.js
     error.middleware.js
   models/
     group.model.js
     health.model.js
+    trail.model.js
     user.model.js
   routes/
     admin.routes.js
@@ -30,6 +32,7 @@ src/
     index.js
     profile.routes.js
     subscription.routes.js
+    trail.routes.js
   services/
     admin.service.js
     analytics.service.js
@@ -37,9 +40,10 @@ src/
     group.service.js
     health.service.js
     payment.service.js
-    profile.service.js
     premium.service.js
+    profile.service.js
     subscription.service.js
+    trail.service.js
     user.store.js
   scripts/
     seed-plans.js
@@ -127,6 +131,44 @@ All group endpoints require:
   - behavior:
     - prevents duplicate joins
     - adds user to `members` when valid
+
+## Trail planning endpoints
+
+All trail endpoints require:
+
+- header: `Authorization: Bearer <token>`
+
+- `POST /api/trails`
+  - description: create a new trail
+  - body: `name` (required), `waypoints[]` (required, min 2 with start and end), optional `description`, `region`, `country`, `difficulty`, `distanceKm`, `estimatedDurationMin`, `elevationGainM`, `tags`, `emergencyNumbers[]`, `status`, `plannedStartDate`, `groupId`
+
+- `GET /api/trails`
+  - description: list trails created by the authenticated user
+  - query: optional `status`, `groupId` filters
+
+- `GET /api/trails/:id`
+  - description: get one trail owned by the authenticated user
+
+- `PATCH /api/trails/:id`
+  - description: update trail fields
+  - body: any combination of `name`, `description`, `region`, `country`, `difficulty`, `distanceKm`, `estimatedDurationMin`, `elevationGainM`, `tags`, `status`, `plannedStartDate`, `waypoints[]`, `emergencyNumbers[]`
+
+- `DELETE /api/trails/:id`
+  - description: delete a trail and its associated checklist
+
+- `POST /api/trails/:id/waypoints`
+  - description: add a waypoint to the trail
+  - body: `name`, `latitude`, `longitude`, `type`, optional `description`, `altitudeM`, `orderIndex`, `arrivalEstimateMin`, `notes`
+
+- `DELETE /api/trails/:id/waypoints/:waypointId`
+  - description: remove a waypoint from the trail
+
+- `PUT /api/trails/:id/emergency-numbers`
+  - description: replace all emergency numbers for a trail
+  - body: `emergencyNumbers[]` with `label`, `phone`, optional `type`, `country`
+
+- `GET /api/trails/:id/export`
+  - description: download offline trail data bundle (trail + checklist)
 
 ## B7 Admin endpoints
 
