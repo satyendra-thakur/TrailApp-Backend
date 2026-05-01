@@ -105,6 +105,65 @@ const exportBundle = async (req, res, next) => {
   }
 };
 
+// B3: GPX/KML import. Body is raw XML (text/xml or application/gpx+xml or application/vnd.google-earth.kml+xml).
+const importGpx = async (req, res, next) => {
+  try {
+    const xml = typeof req.body === "string" ? req.body : req.body && req.body.xml;
+    const trail = await trailService.importFromGpx(req.params.id, xml, req.user.id);
+    res.status(200).json({ success: true, data: trail });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const importKml = async (req, res, next) => {
+  try {
+    const xml = typeof req.body === "string" ? req.body : req.body && req.body.xml;
+    const trail = await trailService.importFromKml(req.params.id, xml, req.user.id);
+    res.status(200).json({ success: true, data: trail });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getElevationGraph = async (req, res, next) => {
+  try {
+    const graph = await trailService.getElevationGraph(req.params.id);
+    res.status(200).json({ success: true, data: graph });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const findNear = async (req, res, next) => {
+  try {
+    const trails = await trailService.findTrailsNear({
+      lng: req.query.lng,
+      lat: req.query.lat,
+      radiusKm: req.query.radiusKm,
+      limit: req.query.limit
+    });
+    res.status(200).json({ success: true, data: trails });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const findInBbox = async (req, res, next) => {
+  try {
+    const trails = await trailService.findTrailsInBbox({
+      minLng: req.query.minLng,
+      minLat: req.query.minLat,
+      maxLng: req.query.maxLng,
+      maxLat: req.query.maxLat,
+      limit: req.query.limit
+    });
+    res.status(200).json({ success: true, data: trails });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createTrail,
   listTrails,
@@ -114,5 +173,11 @@ module.exports = {
   addWaypoint,
   removeWaypoint,
   setEmergencyNumbers,
-  exportBundle
+  exportBundle,
+  // B3
+  importGpx,
+  importKml,
+  getElevationGraph,
+  findNear,
+  findInBbox
 };

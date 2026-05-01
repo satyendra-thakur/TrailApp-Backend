@@ -1,8 +1,81 @@
 const mongoose = require("mongoose");
 const Trail = require("../models/trail.model");
 const Checklist = require("../models/checklist.model");
+const { computeDifficultyScore, scoreToBand } = require("../utils/difficulty");
+const { parseGpx, parseKml, summarizePath } = require("../utils/gpx");
 
 const normalizeText = (value) => String(value || "").trim();
+
+// B3: derive GeoJSON location/path + elevation summary + difficulty score
+const buildLocationFromWaypoints = (waypoints) => {
+  const start = waypoints.find((w) => w.type === "start") || waypoints[0];
+  if (!start) return undefined;
+  return { type: "Point", coordinates: [start.longitude, start.latitude] };
+};
+
+const buildPathFromWaypoints = (waypoints) => {
+  const sorted = [...waypoints].sort((a, b) => a.orderIndex - b.orderIndex);
+  if (sorted.length < 2) return undefined;
+  return {
+    type: "LineString",
+    coordinates: sorted.map((w) => [w.longitude, w.latitude])
+  };
+};
+
+const applyB3DerivedFields = (doc, payload, waypoints) => {
+  // Path: explicit > derived from waypoints
+  if (payload.path && Array.isArray(payload.path.coordinates)) {
+    doc.path = {
+      type: "LineString",
+      coordinates: payload.path.coordinates.map(([lng, lat]) => [
+        Number(lng),
+        Number(lat)
+      ])
+    };
+  } else {
+    const derived = buildPathFromWaypoints(waypoints);
+    if (derived) doc.path = derived;
+  }
+
+  // Location: explicit > first path point > start waypoint
+  if (payload.location && Array.isArray(payload.location.coordinates)) {
+    doc.location = {
+      type: "Point",
+      coordinates: [
+        Number(payload.location.coordinates[0]),
+        Number(payload.location.coordinates[1])
+      ]
+    };
+  } else if (doc.path && Array.isArray(doc.path.coordinates) && doc.path.coordinates[0]) {
+    const [lng, lat] = doc.path.coordinates[0];
+    doc.location = { type: "Point", coordinates: [lng, lat] };
+  } else {
+    const loc = buildLocationFromWaypoints(waypoints);
+    if (loc) doc.location = loc;
+  }
+
+  if (Array.isArray(payload.elevationProfile)) {
+    doc.elevationProfile = payload.elevationProfile;
+  }
+
+  const altitudes = waypoints
+    .map((w) => w.altitudeM)
+    .filter((a) => Number.isFinite(a));
+  if (Number.isFinite(payload.maxAltitudeM)) {
+    doc.maxAltitudeM = Number(payload.maxAltitudeM);
+  } else if (altitudes.length) {
+    doc.maxAltitudeM = Math.max(...altitudes);
+  }
+
+  doc.difficultyScore = computeDifficultyScore({
+    distanceKm: doc.distanceKm,
+    elevationGainM: doc.elevationGainM,
+    maxAltitudeM: doc.maxAltitudeM,
+    technicalFactor: Number(payload.technicalFactor) || 0
+  });
+  doc.difficulty = scoreToBand(doc.difficultyScore);
+  return doc;
+};
 
 const buildError = (message, statusCode) => {
   const error = new Error(message);
@@ -125,7 +198,7 @@ const createTrail = async (payload, userId) => {
     groupId = payload.groupId;
   }
 
-  const trail = await Trail.create({
+  const doc = {
     name,
     description: normalizeText(payload.description),
     region: normalizeText(payload.region),
@@ -145,9 +218,11 @@ const createTrail = async (payload, userId) => {
       : null,
     groupId,
     createdBy: userId
-  });
+  };
 
-  return trail;
+  applyB3DerivedFields(doc, payload, waypoints);
+
+  return Trail.create(doc);
 };
 
 const listTrails = async (userId, filters = {}) => {
@@ -219,6 +294,8 @@ const updateTrail = async (trailId, payload, userId) => {
     );
   }
 
+  applyB3DerivedFields(trail, payload, trail.waypoints || []);
+
   trail.version += 1;
   await trail.save();
   return trail;
@@ -269,6 +346,117 @@ const setEmergencyNumbers = async (trailId, numbers, userId) => {
   return trail;
 };
 
+// B3: GPX/KML import. Body is raw XML. Replaces path + elevation + (optionally) waypoints, recomputes difficulty.
+const applyImported = async (trail, parsed) => {
+  if (!parsed.path.length && !parsed.waypoints.length) {
+    throw buildError("Imported file contained no track points or waypoints", 400);
+  }
+
+  const summary = summarizePath(parsed.path);
+
+  if (parsed.path.length >= 2) {
+    trail.path = {
+      type: "LineString",
+      coordinates: parsed.path.map(([lng, lat]) => [lng, lat])
+    };
+    trail.location = {
+      type: "Point",
+      coordinates: [parsed.path[0][0], parsed.path[0][1]]
+    };
+    trail.elevationProfile = summary.elevationProfile;
+    if (summary.distanceKm) trail.distanceKm = summary.distanceKm;
+    if (summary.elevationGainM) trail.elevationGainM = summary.elevationGainM;
+    if (summary.maxAltitudeM) trail.maxAltitudeM = summary.maxAltitudeM;
+  }
+
+  if (parsed.waypoints.length) {
+    trail.waypoints = parsed.waypoints.map((w, i) => ({
+      ...w,
+      orderIndex: i
+    }));
+  }
+
+  trail.difficultyScore = computeDifficultyScore({
+    distanceKm: trail.distanceKm,
+    elevationGainM: trail.elevationGainM,
+    maxAltitudeM: trail.maxAltitudeM
+  });
+  trail.difficulty = scoreToBand(trail.difficultyScore);
+  trail.version += 1;
+  await trail.save();
+  return trail;
+};
+
+const importFromGpx = async (trailId, xml, userId) => {
+  const trail = await getTrailById(trailId, userId);
+  return applyImported(trail, parseGpx(xml));
+};
+
+const importFromKml = async (trailId, xml, userId) => {
+  const trail = await getTrailById(trailId, userId);
+  return applyImported(trail, parseKml(xml));
+};
+
+// B3: elevation graph as a series of {distanceKm, altitudeM} points
+const getElevationGraph = async (trailId) => {
+  ensureObjectId(trailId, "trailId");
+  const trail = await Trail.findById(trailId);
+  if (!trail) throw buildError("Trail not found", 404);
+  return {
+    trailId: trail._id,
+    distanceKm: trail.distanceKm,
+    elevationGainM: trail.elevationGainM,
+    maxAltitudeM: trail.maxAltitudeM,
+    points: trail.elevationProfile
+  };
+};
+
+// B3: geospatial — trails near a point
+const findTrailsNear = async ({ lng, lat, radiusKm = 25, limit = 50 }) => {
+  const lon = Number(lng);
+  const latitude = Number(lat);
+  if (!Number.isFinite(lon) || !Number.isFinite(latitude)) {
+    throw buildError("Valid lng and lat query params are required", 400);
+  }
+  const radius = Math.max(0.1, Number(radiusKm) || 25);
+  return Trail.find({
+    location: {
+      $near: {
+        $geometry: { type: "Point", coordinates: [lon, latitude] },
+        $maxDistance: radius * 1000
+      }
+    }
+  }).limit(Math.min(200, Number(limit) || 50));
+};
+
+// B3: geospatial — trails whose path intersects a bounding box
+const findTrailsInBbox = async ({ minLng, minLat, maxLng, maxLat, limit = 100 }) => {
+  const coords = [minLng, minLat, maxLng, maxLat].map(Number);
+  if (coords.some((n) => !Number.isFinite(n))) {
+    throw buildError(
+      "Valid minLng, minLat, maxLng, maxLat query params are required",
+      400
+    );
+  }
+  const [a, b, c, d] = coords;
+  return Trail.find({
+    path: {
+      $geoIntersects: {
+        $geometry: {
+          type: "Polygon",
+          coordinates: [[
+            [a, b],
+            [c, b],
+            [c, d],
+            [a, d],
+            [a, b]
+          ]]
+        }
+      }
+    }
+  }).limit(Math.min(500, Number(limit) || 100));
+};
+
 // Offline export: one self-contained JSON bundle for client-side caching
 const exportBundle = async (trailId, userId) => {
   const trail = await getTrailById(trailId, userId);
@@ -294,5 +482,11 @@ module.exports = {
   addWaypoint,
   removeWaypoint,
   setEmergencyNumbers,
-  exportBundle
+  exportBundle,
+  // B3
+  importFromGpx,
+  importFromKml,
+  getElevationGraph,
+  findTrailsNear,
+  findTrailsInBbox
 };

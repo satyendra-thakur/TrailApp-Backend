@@ -11,6 +11,7 @@ const analyticsRoutes = require("./analytics.routes");
 const subscriptionRoutes = require("./subscription.routes");
 const paymentRoutes = require("./payment.routes");
 const premiumRoutes = require("./premium.routes");
+const mapRoutes = require("./map.routes");
 
 const router = express.Router();
 
@@ -26,5 +27,6 @@ router.use("/analytics", analyticsRoutes);
 router.use("/subscriptions", subscriptionRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/premium", premiumRoutes);
+router.use("/map", mapRoutes);
 
 module.exports = router;

@@ -194,6 +194,33 @@ const trailSchema = new mongoose.Schema(
       type: Date,
       default: null
     },
+    // B3: Trail Data & Map fields
+    location: {
+      type: { type: String, enum: ["Point"], default: "Point" },
+      coordinates: { type: [Number], default: undefined } // [lng, lat]
+    },
+    path: {
+      type: { type: String, enum: ["LineString"], default: "LineString" },
+      coordinates: { type: [[Number]], default: undefined } // [[lng, lat], ...]
+    },
+    elevationProfile: {
+      type: [
+        {
+          distanceKm: { type: Number, required: true, min: 0 },
+          altitudeM: { type: Number, required: true }
+        }
+      ],
+      default: []
+    },
+    maxAltitudeM: {
+      type: Number,
+      default: 0
+    },
+    difficultyScore: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
     version: {
       type: Number,
       default: 1,
@@ -206,4 +233,8 @@ const trailSchema = new mongoose.Schema(
 );
 
 trailSchema.index({ createdBy: 1, status: 1 });
+trailSchema.index({ location: "2dsphere" });
+trailSchema.index({ path: "2dsphere" });
+trailSchema.index({ name: "text", description: "text", region: "text" });
+
 module.exports = mongoose.model("Trail", trailSchema);
