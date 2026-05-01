@@ -11,28 +11,52 @@ src/
     auth.controller.js
     group.controller.js
     health.controller.js
+    message.controller.js
     profile.controller.js
+    trail.controller.js
   middlewares/
     auth.middleware.js
     error.middleware.js
   models/
     group.model.js
     health.model.js
+    message.model.js
+    trail.model.js
     user.model.js
   routes/
+    admin.routes.js
+    analytics.routes.js
     auth.routes.js
     group.routes.js
     health.routes.js
+    payment.routes.js
+    premium.routes.js
     index.js
+    message.routes.js
     profile.routes.js
+    subscription.routes.js
+    trail.routes.js
   services/
+    admin.service.js
+    analytics.service.js
     auth.service.js
     group.service.js
     health.service.js
+    message.service.js
+    payment.service.js
+    premium.service.js
     profile.service.js
+    subscription.service.js
+    trail.service.js
     user.store.js
+  scripts/
+    seed-plans.js
+  tests/
+    api.test.js
+    setup-test-db.js
   app.js
   server.js
+  socket.js
 ```
 
 ## Setup
@@ -63,6 +87,18 @@ src/
    npm run dev
    ```
 
+5. Seed subscription plans:
+
+   ```bash
+   npm run seed:plans
+   ```
+
+6. Run automated tests:
+
+   ```bash
+   npm test
+   ```
+
 ## Test endpoint
 
 - `GET /api/health`
@@ -78,8 +114,9 @@ src/
 - `PUT /api/profile`
   - header: `Authorization: Bearer <token>`
   - body (optional): `fullName`, `phone`, `country`, `preferredLanguage`, `bio`, `photoUrl`, `emergencyContact`, `touristMode`
+  - note: `role` is included in JWT payload and supports `user`, `moderator`, `admin`, `super_admin`
 
-## Group endpoints
+## Group endpoints (B5)
 
 All group endpoints require:
 
@@ -99,3 +136,126 @@ All group endpoints require:
   - behavior:
     - prevents duplicate joins
     - adds user to `members` when valid
+
+## Message endpoints (B5)
+
+All message endpoints require:
+
+- header: `Authorization: Bearer <token>`
+- requester must be a member of the target group
+
+- `POST /api/groups/:groupId/messages`
+  - description: send a message to a group
+  - body: `text` (required, 1-2000 chars)
+  - behavior:
+    - validates membership before sending
+    - stores message with `sender`, `groupId`, `text`
+    - emits Socket.IO event `message:new` to room `group:<groupId>`
+
+- `GET /api/groups/:groupId/messages`
+  - description: get paginated group messages (newest first)
+  - query:
+    - `page` (optional, default `1`)
+    - `limit` (optional, default `20`, max `100`)
+  - response includes:
+    - `data`: message list
+    - `pagination`: `page`, `limit`, `total`, `totalPages`
+
+## Socket events (B5)
+
+Socket connection requires JWT (via `auth.token` or `Authorization` header):
+
+- client emits `group:join` with `groupId`
+- server emits:
+  - `group:joined` when room join succeeds
+  - `group:error` when join fails
+  - `message:new` when a new message is sent to the group
+
+## Trail planning endpoints
+
+All trail endpoints require:
+
+- header: `Authorization: Bearer <token>`
+
+- `POST /api/trails`
+  - description: create a new trail
+  - body: `name` (required), `waypoints[]` (required, min 2 with start and end), optional `description`, `region`, `country`, `difficulty`, `distanceKm`, `estimatedDurationMin`, `elevationGainM`, `tags`, `emergencyNumbers[]`, `status`, `plannedStartDate`, `groupId`
+
+- `GET /api/trails`
+  - description: list trails created by the authenticated user
+  - query: optional `status`, `groupId` filters
+
+- `GET /api/trails/:id`
+  - description: get one trail owned by the authenticated user
+
+- `PATCH /api/trails/:id`
+  - description: update trail fields
+  - body: any combination of `name`, `description`, `region`, `country`, `difficulty`, `distanceKm`, `estimatedDurationMin`, `elevationGainM`, `tags`, `status`, `plannedStartDate`, `waypoints[]`, `emergencyNumbers[]`
+
+- `DELETE /api/trails/:id`
+  - description: delete a trail and its associated checklist
+
+- `POST /api/trails/:id/waypoints`
+  - description: add a waypoint to the trail
+  - body: `name`, `latitude`, `longitude`, `type`, optional `description`, `altitudeM`, `orderIndex`, `arrivalEstimateMin`, `notes`
+
+- `DELETE /api/trails/:id/waypoints/:waypointId`
+  - description: remove a waypoint from the trail
+
+- `PUT /api/trails/:id/emergency-numbers`
+  - description: replace all emergency numbers for a trail
+  - body: `emergencyNumbers[]` with `label`, `phone`, optional `type`, `country`
+
+- `GET /api/trails/:id/export`
+  - description: download offline trail data bundle (trail + checklist)
+
+## B7 Admin endpoints
+
+All admin endpoints require:
+
+- header: `Authorization: Bearer <token>`
+- role: `moderator`, `admin`, or `super_admin`
+
+- `GET /api/admin/pending`
+  - description: fetch pending trails, homestays, and reviews for moderation
+
+- `PATCH /api/admin/trails/:trailId/decision`
+- `PATCH /api/admin/homestays/:homestayId/decision`
+- `PATCH /api/admin/reviews/:reviewId/decision`
+  - body: `decision` (`approved` or `rejected`), `moderationNote` (optional)
+
+## B7 Premium endpoints
+
+- `GET /api/subscriptions/plans`
+  - description: fetch available premium plans
+
+- `POST /api/subscriptions/checkout`
+  - header: `Authorization: Bearer <token>`
+  - body: `planCode`
+
+- `GET /api/subscriptions/me`
+  - header: `Authorization: Bearer <token>`
+
+- `PATCH /api/subscriptions/:subscriptionId/cancel`
+  - header: `Authorization: Bearer <token>`
+
+- `POST /api/payments/verify`
+  - header: `Authorization: Bearer <token>`
+  - body: `transactionRef` or `sessionId`
+
+- `POST /api/payments/webhook`
+  - description: placeholder webhook endpoint for payment provider callbacks
+
+- `GET /api/premium/me`
+  - header: `Authorization: Bearer <token>`
+  - description: returns premium status and enabled features
+
+## B7 Analytics endpoints
+
+All analytics endpoints require:
+
+- header: `Authorization: Bearer <token>`
+- role: `admin` or `super_admin`
+
+- `GET /api/analytics/overview`
+- `GET /api/analytics/premium`
