@@ -41,11 +41,23 @@ const reviewSchema = new mongoose.Schema(
     approvedAt: {
       type: Date,
       default: null
+    },
+    reportedBy: {
+      type: [mongoose.Schema.Types.ObjectId],
+      default: [],
+      ref: "User"
+    },
+    reportCount: {
+      type: Number,
+      default: 0
     }
   },
   {
     timestamps: true
   }
 );
+
+reviewSchema.index({ entityType: 1, entityId: 1 });
+reviewSchema.index({ approvalStatus: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Review", reviewSchema);

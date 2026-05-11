@@ -51,6 +51,18 @@ const initializeSocket = (httpServer) => {
         });
       }
     });
+
+    socket.on("trail:join", (trailId) => {
+      if (trailId) {
+        socket.join(`trail:${trailId}`);
+      }
+    });
+
+    socket.on("trail:leave", (trailId) => {
+      if (trailId) {
+        socket.leave(`trail:${trailId}`);
+      }
+    });
   });
 
   return ioInstance;

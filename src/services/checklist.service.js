@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Checklist = require("../models/checklist.model");
 const Trail = require("../models/trail.model");
+const { getIo } = require("../socket");
 
 const normalizeText = (value) => String(value || "").trim();
 
@@ -60,7 +61,7 @@ const sanitizeItem = (raw) => {
   if (!raw || typeof raw !== "object") {
     throw buildError("Each item must be an object", 400);
   }
-  const name = normalizeText(raw.name);
+  const name = normalizeText(raw.name || raw.label);
   if (!name) {
     throw buildError("Item name is required", 400);
   }
@@ -69,7 +70,7 @@ const sanitizeItem = (raw) => {
     category: raw.category || "gear",
     quantity: Number.isFinite(Number(raw.quantity)) ? Number(raw.quantity) : 1,
     isEssential: Boolean(raw.isEssential),
-    isChecked: Boolean(raw.isChecked),
+    isChecked: Boolean(raw.isChecked || raw.packed),
     notes: normalizeText(raw.notes)
   };
 };
@@ -113,6 +114,8 @@ const replaceItems = async (trailId, items, userId) => {
   const checklist = await getOrCreateChecklist(trailId, userId);
   checklist.items = items.map(sanitizeItem);
   await checklist.save();
+  const io = getIo();
+  if (io) io.to(`trail:${trailId}`).emit("trail:checklist_updated", checklist.items);
   return checklist;
 };
 
@@ -120,6 +123,8 @@ const addItem = async (trailId, payload, userId) => {
   const checklist = await getOrCreateChecklist(trailId, userId);
   checklist.items.push(sanitizeItem(payload));
   await checklist.save();
+  const io = getIo();
+  if (io) io.to(`trail:${trailId}`).emit("trail:checklist_updated", checklist.items);
   return checklist;
 };
 
@@ -143,6 +148,8 @@ const updateItem = async (trailId, itemId, payload, userId) => {
   if (payload.notes !== undefined) item.notes = normalizeText(payload.notes);
 
   await checklist.save();
+  const io = getIo();
+  if (io) io.to(`trail:${trailId}`).emit("trail:checklist_updated", checklist.items);
   return checklist;
 };
 
@@ -158,6 +165,8 @@ const removeItem = async (trailId, itemId, userId) => {
     throw buildError("Item not found", 404);
   }
   await checklist.save();
+  const io = getIo();
+  if (io) io.to(`trail:${trailId}`).emit("trail:checklist_updated", checklist.items);
   return checklist;
 };
 
