@@ -163,12 +163,6 @@ const trailSchema = new mongoose.Schema(
       type: Date,
       default: null
     },
-    groupId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Group",
-      default: null,
-      index: true
-    },
     createdBy: {
       type: String,
       required: true,

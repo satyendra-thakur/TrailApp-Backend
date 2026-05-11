@@ -1,6 +1,9 @@
 const mongoose = require("mongoose");
+const multer = require("multer");
+const GPXParser = require("gpxparser");
 const Trail = require("../models/trail.model");
 const Checklist = require("../models/checklist.model");
+const { getIo } = require("../socket");
 
 const normalizeText = (value) => String(value || "").trim();
 
@@ -119,12 +122,6 @@ const createTrail = async (payload, userId) => {
     : [];
   const emergencyNumbers = emergencyInput.map(sanitizeEmergencyNumber);
 
-  let groupId = null;
-  if (payload.groupId) {
-    ensureObjectId(payload.groupId, "groupId");
-    groupId = payload.groupId;
-  }
-
   const trail = await Trail.create({
     name,
     description: normalizeText(payload.description),
@@ -143,7 +140,6 @@ const createTrail = async (payload, userId) => {
     plannedStartDate: payload.plannedStartDate
       ? new Date(payload.plannedStartDate)
       : null,
-    groupId,
     createdBy: userId
   });
 
@@ -156,12 +152,39 @@ const listTrails = async (userId, filters = {}) => {
   if (filters.status) {
     query.status = filters.status;
   }
-  if (filters.groupId) {
-    ensureObjectId(filters.groupId, "groupId");
-    query.groupId = filters.groupId;
-  }
 
   return Trail.find(query).sort({ updatedAt: -1 });
+};
+
+const listPublicTrails = async (filters = {}) => {
+  const query = { approvalStatus: "approved" };
+
+  if (filters.search) {
+    const regex = new RegExp(filters.search, "i");
+    query.$or = [
+      { name: regex },
+      { region: regex },
+      { description: regex },
+      { tags: regex }
+    ];
+  }
+  if (filters.difficulty) query.difficulty = filters.difficulty;
+  if (filters.country) query.country = new RegExp(filters.country, "i");
+  if (filters.region) query.region = new RegExp(filters.region, "i");
+
+  const page = Math.max(Number(filters.page) || 1, 1);
+  const limit = Math.min(Math.max(Number(filters.limit) || 20, 1), 100);
+  const skip = (page - 1) * limit;
+
+  const [trails, total] = await Promise.all([
+    Trail.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit),
+    Trail.countDocuments(query)
+  ]);
+
+  return {
+    trails,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+  };
 };
 
 const getTrailById = async (trailId, userId) => {
@@ -239,6 +262,8 @@ const addWaypoint = async (trailId, payload, userId) => {
   trail.waypoints.push(waypoint);
   trail.version += 1;
   await trail.save();
+  const io = getIo();
+  if (io) io.to(`trail:${trailId}`).emit("trail:waypoints_updated", trail.waypoints);
   return trail;
 };
 
@@ -255,6 +280,8 @@ const removeWaypoint = async (trailId, waypointId, userId) => {
   }
   trail.version += 1;
   await trail.save();
+  const io = getIo();
+  if (io) io.to(`trail:${trailId}`).emit("trail:waypoints_updated", trail.waypoints);
   return trail;
 };
 
@@ -266,6 +293,8 @@ const setEmergencyNumbers = async (trailId, numbers, userId) => {
   trail.emergencyNumbers = numbers.map(sanitizeEmergencyNumber);
   trail.version += 1;
   await trail.save();
+  const io = getIo();
+  if (io) io.to(`trail:${trailId}`).emit("trail:emergency_updated", trail.emergencyNumbers);
   return trail;
 };
 
@@ -285,9 +314,106 @@ const exportBundle = async (trailId, userId) => {
   };
 };
 
+const gpxUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+}).single("file");
+
+const runGpxUpload = (req, res) =>
+  new Promise((resolve, reject) => {
+    gpxUpload(req, res, (err) => {
+      if (err) return reject(err);
+      resolve();
+    });
+  });
+
+const parseGpxUpload = async (req) => {
+  await runGpxUpload(req, {});
+
+  if (!req.file) {
+    throw buildError('GPX file is required (field name: "file")', 400);
+  }
+
+  const filename = normalizeText(req.file.originalname);
+  const xml = req.file.buffer.toString("utf-8");
+
+  const parser = new GPXParser();
+  try {
+    parser.parse(xml);
+  } catch {
+    throw buildError("Unable to parse GPX file", 400);
+  }
+
+  const points = [];
+
+  // Prefer tracks, then routes, then waypoints
+  if (Array.isArray(parser.tracks) && parser.tracks.length > 0) {
+    parser.tracks.forEach((track) => {
+      (track.segments || []).forEach((seg) => {
+        (seg || []).forEach((pt) => points.push(pt));
+      });
+    });
+  } else if (Array.isArray(parser.routes) && parser.routes.length > 0) {
+    parser.routes.forEach((route) => {
+      (route.points || []).forEach((pt) => points.push(pt));
+    });
+  } else if (Array.isArray(parser.waypoints) && parser.waypoints.length > 0) {
+    parser.waypoints.forEach((pt) => points.push(pt));
+  }
+
+  if (points.length < 2) {
+    throw buildError("GPX must contain at least 2 points", 400);
+  }
+
+  // Downsample huge tracks to keep UI snappy
+  const maxPoints = 200;
+  const step = Math.ceil(points.length / maxPoints);
+  const sampled = points.filter((_, idx) => idx % step === 0);
+
+  const waypoints = sampled.map((pt, index) => {
+    const name = normalizeText(pt.name) || `Point ${index + 1}`;
+    const latitude = Number(pt.lat);
+    const longitude = Number(pt.lon);
+    const altitudeM =
+      pt.ele === undefined || pt.ele === null ? null : Number(pt.ele);
+
+    return sanitizeWaypoint(
+      {
+        name,
+        latitude,
+        longitude,
+        altitudeM,
+        type: "checkpoint",
+        orderIndex: index
+      },
+      index
+    );
+  });
+
+  // Mark start/end types for the creation pipeline
+  waypoints[0].type = "start";
+  waypoints[waypoints.length - 1].type = "end";
+
+  const altitudes = waypoints
+    .map((w) => w.altitudeM)
+    .filter((v) => Number.isFinite(v));
+
+  return {
+    filename,
+    totalPoints: points.length,
+    sampledPoints: waypoints.length,
+    altitude: altitudes.length
+      ? { minM: Math.min(...altitudes), maxM: Math.max(...altitudes) }
+      : null,
+    waypoints
+  };
+};
+
 module.exports = {
+  parseGpxUpload,
   createTrail,
   listTrails,
+  listPublicTrails,
   getTrailById,
   updateTrail,
   deleteTrail,

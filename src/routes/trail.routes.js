@@ -4,6 +4,13 @@ const { requireAuth } = require("../middlewares/auth.middleware");
 
 const router = express.Router();
 
+router.post(
+  "/upload-gpx",
+  requireAuth,
+  trailController.uploadGpx
+);
+
+router.get("/public", trailController.listPublicTrails);
 router.post("/", requireAuth, trailController.createTrail);
 router.get("/", requireAuth, trailController.listTrails);
 router.get("/:id", requireAuth, trailController.getTrail);

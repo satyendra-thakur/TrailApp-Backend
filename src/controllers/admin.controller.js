@@ -57,9 +57,43 @@ const moderateReview = async (req, res, next) => {
   }
 };
 
+const moderateEvent = async (req, res, next) => {
+  try {
+    const data = await adminService.moderateResource(
+      "events",
+      req.params.eventId,
+      req.body.decision,
+      req.body.moderationNote,
+      req.user
+    );
+
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const moderateLocalService = async (req, res, next) => {
+  try {
+    const data = await adminService.moderateResource(
+      "localservices",
+      req.params.serviceId,
+      req.body.decision,
+      req.body.moderationNote,
+      req.user
+    );
+
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getPendingApprovals,
   moderateTrail,
   moderateHomestay,
-  moderateReview
+  moderateReview,
+  moderateEvent,
+  moderateLocalService
 };

@@ -11,6 +11,11 @@ const analyticsRoutes = require("./analytics.routes");
 const subscriptionRoutes = require("./subscription.routes");
 const paymentRoutes = require("./payment.routes");
 const premiumRoutes = require("./premium.routes");
+const activityRoutes = require("./activity.routes");
+const homestayRoutes = require("./homestay.routes");
+const reviewRoutes = require("./review.routes");
+const eventRoutes = require("./event.routes");
+const localServiceRoutes = require("./localservice.routes");
 
 const router = express.Router();
 
@@ -26,5 +31,10 @@ router.use("/analytics", analyticsRoutes);
 router.use("/subscriptions", subscriptionRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/premium", premiumRoutes);
+router.use("/activities", activityRoutes);
+router.use("/homestays", homestayRoutes);
+router.use("/reviews", reviewRoutes);
+router.use("/events", eventRoutes);
+router.use("/localservices", localServiceRoutes);
 
 module.exports = router;
