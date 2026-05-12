@@ -16,6 +16,10 @@ const xmlParser = express.text({
   limit: "10mb"
 });
 
+// B4/B6: GPX file upload (multipart) + public listing
+router.post("/upload-gpx", requireAuth, trailController.uploadGpx);
+router.get("/public", trailController.listPublicTrails);
+
 router.post("/", requireAuth, trailController.createTrail);
 router.get("/", requireAuth, trailController.listTrails);
 

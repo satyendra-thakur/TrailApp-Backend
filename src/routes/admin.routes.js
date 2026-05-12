@@ -11,5 +11,7 @@ router.get("/pending", adminController.getPendingApprovals);
 router.patch("/trails/:trailId/decision", adminController.moderateTrail);
 router.patch("/homestays/:homestayId/decision", adminController.moderateHomestay);
 router.patch("/reviews/:reviewId/decision", adminController.moderateReview);
+router.patch("/events/:eventId/decision", adminController.moderateEvent);
+router.patch("/localservices/:serviceId/decision", adminController.moderateLocalService);
 
 module.exports = router;

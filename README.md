@@ -29,6 +29,7 @@ src/
     auth.routes.js
     group.routes.js
     health.routes.js
+    message.routes.js
     payment.routes.js
     premium.routes.js
     index.js
@@ -137,29 +138,31 @@ All group endpoints require:
     - prevents duplicate joins
     - adds user to `members` when valid
 
-## Message endpoints (B5)
+## B5 Message endpoints
 
 All message endpoints require:
 
 - header: `Authorization: Bearer <token>`
-- requester must be a member of the target group
+- authenticated user must be a member of the target group
 
 - `POST /api/groups/:groupId/messages`
-  - description: send a message to a group
-  - body: `text` (required, 1-2000 chars)
+  - description: send a message to a group chat
+  - body: `text` (required)
   - behavior:
-    - validates membership before sending
-    - stores message with `sender`, `groupId`, `text`
-    - emits Socket.IO event `message:new` to room `group:<groupId>`
+    - returns `201` with `{ success: true, data: message }`
+    - `text` is required (returns `400` if missing/empty)
+    - returns `403` if requester is not a group member
+    - emits realtime event `message:new` to Socket.IO room `group:<groupId>`
 
 - `GET /api/groups/:groupId/messages`
-  - description: get paginated group messages (newest first)
-  - query:
-    - `page` (optional, default `1`)
-    - `limit` (optional, default `20`, max `100`)
-  - response includes:
-    - `data`: message list
-    - `pagination`: `page`, `limit`, `total`, `totalPages`
+  - description: fetch group messages with pagination (newest first)
+  - query (optional):
+    - `page` (default: `1`)
+    - `limit` (default: `20`, max: `100`)
+  - behavior:
+    - returns `200` with `{ success: true, data, pagination }`
+    - pagination includes `page`, `limit`, `total`, `totalPages`
+    - returns `403` if requester is not a group member
 
 ## Socket events (B5)
 

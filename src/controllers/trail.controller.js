@@ -1,5 +1,14 @@
 const trailService = require("../services/trail.service");
 
+const uploadGpx = async (req, res, next) => {
+  try {
+    const result = await trailService.parseGpxUpload(req, req.user.id);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const createTrail = async (req, res, next) => {
   try {
     const trail = await trailService.createTrail(req.body, req.user.id);
@@ -12,10 +21,25 @@ const createTrail = async (req, res, next) => {
 const listTrails = async (req, res, next) => {
   try {
     const trails = await trailService.listTrails(req.user.id, {
-      status: req.query.status,
-      groupId: req.query.groupId
+      status: req.query.status
     });
     res.status(200).json({ success: true, data: trails });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const listPublicTrails = async (req, res, next) => {
+  try {
+    const result = await trailService.listPublicTrails({
+      search: req.query.search,
+      difficulty: req.query.difficulty,
+      country: req.query.country,
+      region: req.query.region,
+      page: req.query.page,
+      limit: req.query.limit
+    });
+    res.status(200).json({ success: true, data: result.trails, pagination: result.pagination });
   } catch (error) {
     next(error);
   }
@@ -165,8 +189,10 @@ const findInBbox = async (req, res, next) => {
 };
 
 module.exports = {
+  uploadGpx,
   createTrail,
   listTrails,
+  listPublicTrails,
   getTrail,
   updateTrail,
   deleteTrail,
